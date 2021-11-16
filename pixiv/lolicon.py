@@ -173,7 +173,7 @@ def update(api, offset):
 
 
 def start_sp():
-    offset = 2690
+    offset = 0
     signal.signal(signal.SIGINT, quit)
     signal.signal(signal.SIGTERM, quit)
     while True:

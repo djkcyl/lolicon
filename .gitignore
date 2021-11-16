@@ -2,3 +2,5 @@ images/*
 
 __pycache__
 .vscode
+refresh_token.txt
+pixiv.db
