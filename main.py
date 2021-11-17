@@ -12,6 +12,8 @@ from pixiv.lolicon import start_spider
 
 
 schedulers = BackgroundScheduler()
+schedulers.add_job(start_spider, "interval", hours=1)
+schedulers.start()
 
 
 class BaseModel(Model):
@@ -41,11 +43,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-
-@app.on_event("startup")
-async def startup():
-    schedulers.start()
 
 
 @app.get("/")

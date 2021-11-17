@@ -1,7 +1,6 @@
 import func_timeout
 import importlib
 import requests
-import signal
 import time
 import json
 import sys
@@ -79,20 +78,29 @@ def get_id(api, id):
     exit()
 
 
-def lolicon_update(api, offset):
+def lolicon_update(api, offset=None):
     print("========================================================================")
-    # times = str(int(time.time() * 1000) - 100000000)
-    datea = (13300 + offset) * 100000000 - 1000
-    dateb = (13301 + offset) * 100000000
-    data = {
-        "size": "original",
-        "r18": 2,
-        "num": 100,
-        "dateAfter": datea,
-        "dateBefore": dateb,
-    }
-    date = datea / 1000
-    times = f"{time.gmtime(date).tm_year}-{time.gmtime(date).tm_mon}-{time.gmtime(date).tm_mday}"
+    times = str(int(time.time() * 1000) - 100000000)
+    if offset is None:
+        data = {
+            "size": "original",
+            "r18": 2,
+            "num": 100,
+            "dateAfter": times,
+        }
+    else:
+        datea = (13300 + offset) * 100000000 - 1000
+        dateb = (13301 + offset) * 100000000
+        data = {
+            "size": "original",
+            "r18": 2,
+            "num": 100,
+            "dateAfter": datea,
+            "dateBefore": dateb,
+        }
+        date = datea / 1000
+        times = f"{time.gmtime(date).tm_year}-{time.gmtime(date).tm_mon}-{time.gmtime(date).tm_mday}"
+        logger.info(f"[{offset}] - [{times}]")
 
     illustlist = requests.get(
         url="https://api.lolicon.app/setu/v2",
@@ -108,9 +116,7 @@ def lolicon_update(api, offset):
         )
         image_pid = image_info["pid"]
         image_p = image_info["p"]
-        logger.info(
-            f"[{offset}] - [{times}] - [{i} / {ranknum}] 作品ID：{image_pid}-{image_p}"
-        )
+        logger.info(f"[{i} / {ranknum}] 作品ID：{image_pid}-{image_p}")
         if not exists(str(image_pid) + "_p0"):
             time.sleep(0.3)
             for _ in range(3):
@@ -174,10 +180,11 @@ def lolicon_update(api, offset):
         i += 1
 
 
-def start_spider():
-    offset = 3051
-    signal.signal(signal.SIGINT, quit)
-    signal.signal(signal.SIGTERM, quit)
+def start_spider(first=False):
+    if first:
+        offset = 0
+    else:
+        offset = None
     while True:
         try:
             importlib.reload(sys)
@@ -189,11 +196,15 @@ def start_spider():
             api.auth(refresh_token=_REFRESH_TOKEN)
             logger.info("认证完成")
             logger.info("正在开始爬lolicon API")
-            while True:
-                restarts = lolicon_update(api, offset=offset)
-                if restarts:
-                    break
-                offset += 1
+            if first:
+                while True:
+                    restarts = lolicon_update(api, offset=offset)
+                    if restarts:
+                        break
+                    offset += 1
+            else:
+                restarts = lolicon_update(api)
+                break
         except Exception as e:
             logger.error(e)
             pass

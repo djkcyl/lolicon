@@ -4,5 +4,6 @@ __pycache__
 .vscode
 *.db-journal
 pixiv/lolicon.py
-pixiv.db
+*.db
+*.txt
 .gitignore
