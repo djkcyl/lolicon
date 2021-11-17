@@ -2,5 +2,7 @@ images/*
 
 __pycache__
 .vscode
-refresh_token.txt
+*.db-journal
+pixiv/lolicon.py
 pixiv.db
+.gitignore

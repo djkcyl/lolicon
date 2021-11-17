@@ -79,7 +79,7 @@ def get_id(api, id):
     exit()
 
 
-def update(api, offset):
+def lolicon_update(api, offset):
     print("========================================================================")
     # times = str(int(time.time() * 1000) - 100000000)
     datea = (13300 + offset) * 100000000 - 1000
@@ -108,7 +108,9 @@ def update(api, offset):
         )
         image_pid = image_info["pid"]
         image_p = image_info["p"]
-        logger.info(f"[{offset}] - [{times}] - [{i} / {ranknum}] 作品ID：{image_pid}-{image_p}")
+        logger.info(
+            f"[{offset}] - [{times}] - [{i} / {ranknum}] 作品ID：{image_pid}-{image_p}"
+        )
         if not exists(str(image_pid) + "_p0"):
             time.sleep(0.3)
             for _ in range(3):
@@ -172,8 +174,8 @@ def update(api, offset):
         i += 1
 
 
-def start_sp():
-    offset = 0
+def start_spider():
+    offset = 3051
     signal.signal(signal.SIGINT, quit)
     signal.signal(signal.SIGTERM, quit)
     while True:
@@ -188,7 +190,7 @@ def start_sp():
             logger.info("认证完成")
             logger.info("正在开始爬lolicon API")
             while True:
-                restarts = update(api, offset=offset)
+                restarts = lolicon_update(api, offset=offset)
                 if restarts:
                     break
                 offset += 1

@@ -1,13 +1,14 @@
 import time
 import uvicorn
 
-from apscheduler.schedulers.background import BackgroundScheduler
-from peewee import IntegerField, CharField, Model, fn
 from typing import Optional
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from peewee import IntegerField, CharField, Model, fn
+from apscheduler.schedulers.background import BackgroundScheduler
 
 from pixiv.database.operating import database
+from pixiv.lolicon import start_spider
 
 
 schedulers = BackgroundScheduler()
@@ -19,10 +20,11 @@ class BaseModel(Model):
 
 
 class ImageIn(BaseModel):
+    num = IntegerField()
     Id = IntegerField()
     name = CharField()
     sanity_level = IntegerField()
-    tags = CharField(max_length=512)
+    tags = CharField()
     unlike = IntegerField()
     user_id = IntegerField()
     user_name = CharField()
@@ -43,7 +45,7 @@ app.add_middleware(
 
 @app.on_event("startup")
 async def startup():
-    print("startup")
+    schedulers.start()
 
 
 @app.get("/")
@@ -74,12 +76,14 @@ async def get(san: Optional[int] = 4, only: Optional[bool] = False):
     times = tt - ft
     return {
         "code": 200,
-        "url": f"https://pic.a60.one:8443/{data.Id}.jpg",
+        "id": data.num,
         "pic": data.Id,
         "name": data.name,
+        "tags": data.tags,
         "userid": data.user_id,
         "username": data.user_name,
         "sanity_level": data.sanity_level,
+        "url": f"https://pic.a60.one:8443/{data.Id}.jpg",
         "time": str(round(times * 1000)) + "ms",
     }
 
@@ -97,10 +101,12 @@ def get_userid(userid: int):
             for info in data:
                 info_list.append(
                     {
-                        "url": f"https://pic.a60.one:8443/{data.Id}.jpg",
+                        "id": info.num,
                         "pic": info.Id,
                         "name": info.name,
+                        "tags": info.tags,
                         "sanity_level": info.sanity_level,
+                        "url": f"https://pic.a60.one:8443/{data.Id}.jpg",
                     }
                 )
             return {
@@ -151,12 +157,14 @@ def get_tags(
             for info in data:
                 info_list.append(
                     {
-                        "userid": info.user_id,
-                        "username": info.user_name,
-                        "url": f"https://pic.a60.one:8443/{info.Id}.jpg",
+                        "id": info.num,
                         "pic": info.Id,
                         "name": info.name,
+                        "tags": info.tags,
+                        "userid": info.user_id,
+                        "username": info.user_name,
                         "sanity_level": info.sanity_level,
+                        "url": f"https://pic.a60.one:8443/{info.Id}.jpg",
                     }
                 )
             times = time.time() - tf

@@ -42,7 +42,7 @@ def image_compression(name, san):
 
     img.save(IMAGE_PATH + "/comp/" + name, quality=85)
     finlsize = os.path.getsize(IMAGE_PATH + "/comp/" + name)
-    logger.info(f"压缩完成 {int(finlsize / 1000)}kb / {int(imgsize / 1000)}kb")
+    logger.info(f"压缩完成 {int(finlsize / 1024)}kb / {int(imgsize / 1024)}kb")
     logger.info(name)
 
     # 单独打码存放。应该用不上吧。。。。
