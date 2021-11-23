@@ -40,7 +40,7 @@ class ImageIn(BaseModel):
 
 
 description = (
-    "san为图片等级：三个等级分别对应R-12 R-16 R-18\n"
+    "san为图片等级：三个等级分别对应R-12 R-16 R-18。\n"
     "only为等级锁定：False为不锁定，即可以搜索到符合该等级及该等级以下的图片。True为锁定，即仅可搜索到符合该等级的图片。\n"
     "bytes为返回图片本体：设置为True后会返回图片本体。\n"
     "redirect为重定向：设置为True后会跳转到图片地址。该选项与bytes不可同时使用\n"
@@ -214,7 +214,7 @@ def get_tags(
                     "sanity_level": info.sanity_level,
                     "url": info.image_urls
                     if original
-                    else f"https://pic.a60.one:8443/{data.Id}.jpg",
+                    else f"https://pic.a60.one:8443/{info.Id}.jpg",
                 }
             )
         times = time.time() - tf
