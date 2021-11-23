@@ -33,12 +33,22 @@ class ImageIn(BaseModel):
     unlike = IntegerField()
     user_id = IntegerField()
     user_name = CharField()
+    image_urls = CharField()
 
     class Meta:
         table_name = "image_info"
 
 
-app = FastAPI(title="A60 - LoliconMirror API", description="Pixiv API", version="1.2")
+description = (
+    "san为图片等级：三个等级分别对应R-12 R-16 R-18\n"
+    "only为等级锁定：False为不锁定，即可以搜索到符合该等级及该等级以下的图片。True为锁定，即仅可搜索到符合该等级的图片。\n"
+    "bytes为返回图片本体：设置为True后会返回图片本体。\n"
+    "redirect为重定向：设置为True后会跳转到图片地址。该选项与bytes不可同时使用\n"
+    "original为原图：设置为True后会返回原始图片的地址，请自行准备代理使用。该选项与bytes不可同时使用。"
+)
+
+
+app = FastAPI(title="A60 - LoliconMirror API", description=description, version="1.3")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -58,6 +68,7 @@ async def get(
     only: Optional[bool] = False,
     redirect: Optional[bool] = False,
     bytes: Optional[bool] = False,
+    original: Optional[bool] = False,
 ):
     """
     随机返回一张图
@@ -72,6 +83,10 @@ async def get(
     if bytes and redirect:
         return JSONResponse(
             {"code": 400, "msg": "参数错误，bytes和redirect不能同时为True"}, status_code=400
+        )
+    if bytes and original:
+        return JSONResponse(
+            {"code": 400, "msg": "参数错误，original和bytes不能同时为True"}, status_code=400
         )
 
     ft = time.time()
@@ -90,7 +105,10 @@ async def get(
     times = tt - ft
     if redirect:
         return RedirectResponse(
-            url=f"https://pic.a60.one:8443/{data.Id}.jpg", status_code=302
+            url=data.image_urls
+            if original
+            else f"https://pic.a60.one:8443/{data.Id}.jpg",
+            status_code=302,
         )
     elif bytes:
         return FileResponse(
@@ -109,13 +127,15 @@ async def get(
                 "userid": data.user_id,
                 "username": data.user_name,
                 "sanity_level": data.sanity_level,
-                "url": f"https://pic.a60.one:8443/{data.Id}.jpg",
+                "url": data.image_urls
+                if original
+                else f"https://pic.a60.one:8443/{data.Id}.jpg",
                 "time": str(round(times * 1000)) + "ms",
             }
         )
 
 
-@app.get("/get/userid/{userid}")
+# @app.get("/get/userid/{userid}")
 def get_userid(userid: int):
     ft = time.time()
     data = ImageIn.select().where(ImageIn.user_id == userid)
@@ -157,6 +177,7 @@ def get_tags(
     num: Optional[int] = 5,
     san: Optional[int] = 4,
     only: Optional[bool] = False,
+    original: Optional[bool] = False,
 ):
     if san not in [2, 4, 6]:
         return {"code": 500, "msg": "参数错误，san仅可为 2|4|6"}
@@ -191,7 +212,9 @@ def get_tags(
                     "userid": info.user_id,
                     "username": info.user_name,
                     "sanity_level": info.sanity_level,
-                    "url": f"https://pic.a60.one:8443/{info.Id}.jpg",
+                    "url": info.image_urls
+                    if original
+                    else f"https://pic.a60.one:8443/{data.Id}.jpg",
                 }
             )
         times = time.time() - tf
