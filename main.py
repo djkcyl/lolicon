@@ -1,11 +1,14 @@
 import time
+import base64
 import uvicorn
 
+from pathlib import Path
 from typing import Optional
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from peewee import IntegerField, CharField, Model, fn
 from apscheduler.schedulers.background import BackgroundScheduler
+from fastapi.responses import RedirectResponse, JSONResponse, FileResponse
 
 from pixiv.database.operating import database
 from pixiv.lolicon import start_spider
@@ -35,7 +38,7 @@ class ImageIn(BaseModel):
         table_name = "image_info"
 
 
-app = FastAPI()
+app = FastAPI(title="A60 - LoliconMirror API", description="Pixiv API", version="1.2")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -45,17 +48,31 @@ app.add_middleware(
 )
 
 
-@app.get("/")
-async def get(san: Optional[int] = 4, only: Optional[bool] = False):
+def str_to_base64(string: str) -> str:
+    return base64.b64encode(string.encode("utf-8")).decode("utf-8")
+
+
+@app.get("/", status_code=200)
+async def get(
+    san: Optional[int] = 4,
+    only: Optional[bool] = False,
+    redirect: Optional[bool] = False,
+    bytes: Optional[bool] = False,
+):
     """
     随机返回一张图
     """
     if san not in [2, 4, 6]:
-        return {"code": 500, "msg": "参数错误，san仅可为 2|4|6"}
+        return JSONResponse({"code": 400, "msg": "参数错误，san仅可为 2|4|6"}, status_code=400)
     if only:
         whe = ImageIn.sanity_level == san
     else:
         whe = ImageIn.sanity_level <= san
+
+    if bytes and redirect:
+        return JSONResponse(
+            {"code": 400, "msg": "参数错误，bytes和redirect不能同时为True"}, status_code=400
+        )
 
     ft = time.time()
 
@@ -71,42 +88,55 @@ async def get(san: Optional[int] = 4, only: Optional[bool] = False):
 
     tt = time.time()
     times = tt - ft
-    return {
-        "code": 200,
-        "id": data.num,
-        "pic": data.Id,
-        "name": data.name,
-        "tags": data.tags,
-        "userid": data.user_id,
-        "username": data.user_name,
-        "sanity_level": data.sanity_level,
-        "url": f"https://pic.a60.one:8443/{data.Id}.jpg",
-        "time": str(round(times * 1000)) + "ms",
-    }
+    if redirect:
+        return RedirectResponse(
+            url=f"https://pic.a60.one:8443/{data.Id}.jpg", status_code=302
+        )
+    elif bytes:
+        return FileResponse(
+            Path(f"images/comp/{data.Id}.jpg"),
+            headers={"Pic-NAME-Base64": str_to_base64(data.name)},
+            media_type="image/jpeg",
+        )
+    else:
+        return JSONResponse(
+            {
+                "code": 200,
+                "id": data.num,
+                "pic": data.Id,
+                "name": data.name,
+                "tags": data.tags,
+                "userid": data.user_id,
+                "username": data.user_name,
+                "sanity_level": data.sanity_level,
+                "url": f"https://pic.a60.one:8443/{data.Id}.jpg",
+                "time": str(round(times * 1000)) + "ms",
+            }
+        )
 
 
 @app.get("/get/userid/{userid}")
 def get_userid(userid: int):
-    try:
-        data = ImageIn.select().where(ImageIn.user_id == userid)
-    except Exception:
-        return {"code": 501, "error": "数据库查询失败"}
-    else:
-        data_num = len(data)
-        if data_num > 1:
-            info_list = []
-            for info in data:
-                info_list.append(
-                    {
-                        "id": info.num,
-                        "pic": info.Id,
-                        "name": info.name,
-                        "tags": info.tags,
-                        "sanity_level": info.sanity_level,
-                        "url": f"https://pic.a60.one:8443/{data.Id}.jpg",
-                    }
-                )
-            return {
+    ft = time.time()
+    data = ImageIn.select().where(ImageIn.user_id == userid)
+    data_num = len(data)
+    if data_num > 1:
+        info_list = []
+        for info in data:
+            info_list.append(
+                {
+                    "id": info.num,
+                    "pic": info.Id,
+                    "name": info.name,
+                    "tags": info.tags,
+                    "sanity_level": info.sanity_level,
+                    "url": f"https://pic.a60.one:8443/{data.Id}.jpg",
+                }
+            )
+        tt = time.time()
+        times = tt - ft
+        return JSONResponse(
+            {
                 "code": 200,
                 "data": {
                     "userid": data[0].user_id,
@@ -114,9 +144,11 @@ def get_userid(userid: int):
                     "pic_num": data_num,
                     "pic_list": info_list,
                 },
+                "time": str(round(times * 1000)) + "ms",
             }
-        else:
-            return {"code": 404, "error": "未找到相应作者的图片"}
+        )
+    else:
+        return JSONResponse({"code": 404, "error": "未找到相应作者的图片"}, status_code=404)
 
 
 @app.get("/get/tags/{tags}")
@@ -136,44 +168,44 @@ def get_tags(
     tf = time.time()
     if num > 20:
         return {"code": 511, "error": "操作有误，num最大值为20"}
-    try:
-        data = (
-            ImageIn.select()
-            .where(ImageIn.unlike == 0)
-            .where(whe)
-            .where(fn.Lower(ImageIn.tags).contains(tags.lower()))
-            .order_by(fn.Random())
-            .limit(num)
-        )
-    except Exception:
-        return {"code": 501, "error": "数据库查询失败"}
-    else:
-        data_num = len(data)
-        if data_num > 0:
-            info_list = []
-            for info in data:
-                info_list.append(
-                    {
-                        "id": info.num,
-                        "pic": info.Id,
-                        "name": info.name,
-                        "tags": info.tags,
-                        "userid": info.user_id,
-                        "username": info.user_name,
-                        "sanity_level": info.sanity_level,
-                        "url": f"https://pic.a60.one:8443/{info.Id}.jpg",
-                    }
-                )
-            times = time.time() - tf
-            return {
+
+    data = (
+        ImageIn.select()
+        .where(ImageIn.unlike == 0)
+        .where(whe)
+        .where(fn.Lower(ImageIn.tags).contains(tags.lower()))
+        .order_by(fn.Random())
+        .limit(num)
+    )
+
+    data_num = len(data)
+    if data_num > 0:
+        info_list = []
+        for info in data:
+            info_list.append(
+                {
+                    "id": info.num,
+                    "pic": info.Id,
+                    "name": info.name,
+                    "tags": info.tags,
+                    "userid": info.user_id,
+                    "username": info.user_name,
+                    "sanity_level": info.sanity_level,
+                    "url": f"https://pic.a60.one:8443/{info.Id}.jpg",
+                }
+            )
+        times = time.time() - tf
+        return JSONResponse(
+            {
                 "code": 200,
                 "data": {"tags": tags, "pic_list": info_list},
                 "time": str(round(times * 1000)) + "ms",
             }
-        else:
-            return {"code": 404, "error": "未找到相应tag的图片"}
+        )
+    else:
+        return JSONResponse({"code": 404, "error": "未找到相应tag的图片"}, status_code=404)
 
 
 if __name__ == "__main__":
 
-    uvicorn.run("main:app", host="0.0.0.0", port=404, debug=True, reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=404)
