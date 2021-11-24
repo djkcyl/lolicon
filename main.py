@@ -40,6 +40,7 @@ class ImageIn(BaseModel):
 
 
 description = (
+    "num为图片数量：最大只能为5。\n"
     "san为图片等级：三个等级分别对应R-12 R-16 R-18。\n"
     "only为等级锁定：False为不锁定，即可以搜索到符合该等级及该等级以下的图片。True为锁定，即仅可搜索到符合该等级的图片。\n"
     "bytes为返回图片本体：设置为True后会返回图片本体。\n"
@@ -62,8 +63,9 @@ def str_to_base64(string: str) -> str:
     return base64.b64encode(string.encode("utf-8")).decode("utf-8")
 
 
-@app.get("/", status_code=200)
+@app.get("/")
 async def get(
+    num: Optional[int] = 1,
     san: Optional[int] = 4,
     only: Optional[bool] = False,
     redirect: Optional[bool] = False,
@@ -71,8 +73,14 @@ async def get(
     original: Optional[bool] = False,
 ):
     """
-    随机返回一张图
+    随机返回图
     """
+    if abs(num) < 0:
+        num = 1
+    elif abs(num) > 5:
+        num = 5
+    else:
+        num = abs(num)
     if san not in [2, 4, 6]:
         return JSONResponse({"code": 400, "msg": "参数错误，san仅可为 2|4|6"}, status_code=400)
     if only:
@@ -80,56 +88,68 @@ async def get(
     else:
         whe = ImageIn.sanity_level <= san
 
+    if bytes and num != 1:
+        return JSONResponse(
+            {"code": 400, "msg": "参数错误，bytes为True时num只能为1"}, status_code=400
+        )
     if bytes and redirect:
         return JSONResponse(
             {"code": 400, "msg": "参数错误，bytes和redirect不能同时为True"}, status_code=400
         )
     if bytes and original:
         return JSONResponse(
-            {"code": 400, "msg": "参数错误，original和bytes不能同时为True"}, status_code=400
+            {"code": 400, "msg": "参数错误，bytes和original不能同时为True"}, status_code=400
         )
 
     ft = time.time()
 
-    imgId = (
-        ImageIn.select(ImageIn.Id)
+    data = (
+        ImageIn.select()
         .where(whe)
         .where(ImageIn.unlike == 0)
         .order_by(fn.Random())
-        .limit(1)
+        .limit(num)
     )
-    datanum = imgId[0]
-    data = ImageIn.select().where(ImageIn.Id == datanum.Id)[0]
+
+    oneimg: ImageIn = data[0]
 
     tt = time.time()
     times = tt - ft
     if redirect:
         return RedirectResponse(
-            url=data.image_urls
+            url=oneimg.image_urls
             if original
-            else f"https://pic.a60.one:8443/{data.Id}.jpg",
+            else f"https://pic.a60.one:8443/{oneimg.Id}.jpg",
             status_code=302,
         )
     elif bytes:
         return FileResponse(
-            Path(f"images/comp/{data.Id}.jpg"),
-            headers={"Pic-NAME-Base64": str_to_base64(data.name)},
+            Path(f"images/comp/{oneimg.Id}.jpg"),
+            headers={"Pic-NAME-Base64": str_to_base64(oneimg.name)},
             media_type="image/jpeg",
         )
     else:
+        imgs = []
+        for img in data:
+            img: ImageIn
+            imgs.append(
+                {
+                    "id": img.num,
+                    "pic": img.Id,
+                    "name": img.name,
+                    "tags": img.tags,
+                    "userid": img.user_id,
+                    "username": img.user_name,
+                    "sanity_level": img.sanity_level,
+                    "url": img.image_urls
+                    if original
+                    else f"https://pic.a60.one:8443/{img.Id}.jpg",
+                }
+            )
         return JSONResponse(
             {
                 "code": 200,
-                "id": data.num,
-                "pic": data.Id,
-                "name": data.name,
-                "tags": data.tags,
-                "userid": data.user_id,
-                "username": data.user_name,
-                "sanity_level": data.sanity_level,
-                "url": data.image_urls
-                if original
-                else f"https://pic.a60.one:8443/{data.Id}.jpg",
+                "imgs": imgs,
                 "time": str(round(times * 1000)) + "ms",
             }
         )
@@ -179,6 +199,9 @@ def get_tags(
     only: Optional[bool] = False,
     original: Optional[bool] = False,
 ):
+    """
+    随机返回一张符合tag的图
+    """
     if san not in [2, 4, 6]:
         return {"code": 500, "msg": "参数错误，san仅可为 2|4|6"}
     if only:
