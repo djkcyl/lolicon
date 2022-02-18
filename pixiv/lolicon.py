@@ -20,7 +20,7 @@ if _REFRESH_TOKEN == "":
     logger.error("refresh_token.txt 为空，请检查")
     exit()
 
-proxies = {"http": "localhost:10809", "https": "localhost:10809"}
+proxies = {"http": "http://localhost:10811", "https": "http://localhost:10811"}
 
 
 def download_image(url, pid, num, info):
@@ -111,9 +111,7 @@ def lolicon_update(api, offset=None):
     logger.info(f"已获取lolicon总计 {ranknum} 个")
     i = 1
     for image_info in illustlist["data"]:
-        print(
-            "========================================================================"
-        )
+        print("========================================================================")
         image_pid = image_info["pid"]
         image_p = image_info["p"]
         logger.info(f"[{i} / {ranknum}] 作品ID：{image_pid}-{image_p}")

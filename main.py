@@ -194,7 +194,7 @@ def get_userid(userid: int):
 @app.get("/get/tags/{tags}")
 def get_tags(
     tags: str,
-    num: Optional[int] = 5,
+    num: Optional[int] = 1,
     san: Optional[int] = 4,
     only: Optional[bool] = False,
     original: Optional[bool] = False,
@@ -202,16 +202,21 @@ def get_tags(
     """
     随机返回一张符合tag的图
     """
+    if abs(num) < 0:
+        num = 1
+    elif abs(num) > 5:
+        num = 5
+    else:
+        num = abs(num)
+
     if san not in [2, 4, 6]:
-        return {"code": 500, "msg": "参数错误，san仅可为 2|4|6"}
+        return JSONResponse({"code": 400, "msg": "参数错误，san仅可为 2|4|6"}, status_code=400)
     if only:
         whe = ImageIn.sanity_level == san
     else:
         whe = ImageIn.sanity_level <= san
 
     tf = time.time()
-    if num > 20:
-        return {"code": 511, "error": "操作有误，num最大值为20"}
 
     data = (
         ImageIn.select()
@@ -226,6 +231,7 @@ def get_tags(
     if data_num > 0:
         info_list = []
         for info in data:
+            info: ImageIn
             info_list.append(
                 {
                     "id": info.num,
@@ -244,7 +250,7 @@ def get_tags(
         return JSONResponse(
             {
                 "code": 200,
-                "data": {"tags": tags, "pic_list": info_list},
+                "data": {"tags": tags, "imgs": info_list},
                 "time": str(round(times * 1000)) + "ms",
             }
         )
