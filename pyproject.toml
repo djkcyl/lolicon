@@ -11,7 +11,10 @@ fastapi = {extras = ["all"], version = "^0.70.0"}
 apscheduler = "^3.8.1"
 func-timeout = "^4.3.5"
 pixivpy = "^3.6.1"
-pillow = "^8.4.0"
+pillow = "^9.2.0"
+tencentcloud-sdk-python = "^3.0.598"
+slowapi = "^0.1.5"
+fastapi-limiter = "^0.1.4"
 
 [tool.poetry.dev-dependencies]
 black = {version = "^21.10b0", allow-prereleases = true}

@@ -20,18 +20,18 @@ if _REFRESH_TOKEN == "":
     logger.error("refresh_token.txt 为空，请检查")
     exit()
 
-proxies = {"http": "http://localhost:10811", "https": "http://localhost:10811"}
+proxies = {"http": "http://127.0.0.1:10811", "https": "http://127.0.0.1:10811"}
 
 
 def download_image(url, pid, num, info):
     headers = {"referer": "https://www.pixiv.net/"}
-    image_pid = str(pid) + "_p" + str(num)
+    image_pid = f"{str(pid)}_p{str(num)}"
     for retry in range(5):
         try:
             if os.path.exists(f"{IMAGE_PATH}/comp/{image_pid}.jpg"):
                 logger.info("图片已下载完成")
             else:
-                logger.info("正在下载：" + url)
+                logger.info(f"正在下载：{url}")
                 r = requests.get(url=url, headers=headers, proxies=proxies)
                 image_fcontent = r.content
                 with open(f"{IMAGE_PATH}/{image_pid}.jpg", "wb") as f:
@@ -39,7 +39,7 @@ def download_image(url, pid, num, info):
                 logger.info("下载完成")
                 time.sleep(0.1)
                 image_comp = image_compression(
-                    image_pid + ".jpg", int(info["sanity_level"])
+                    f"{image_pid}.jpg", int(info["sanity_level"])
                 )
                 if image_comp[0] == 0:
                     add_new(
@@ -55,8 +55,8 @@ def download_image(url, pid, num, info):
                     return
                 else:
                     logger.error("保存失败，正在重试")
-        except Exception:
-            logger.error(f"下载错误，正在重试 {retry}")
+        except Exception as e:
+            logger.error(f"下载错误，正在重试 {retry} {e}")
             time.sleep(3)
     logger.error("重试五次后仍保存失败，请检查")
     os.system(f"cp {IMAGE_PATH}/{image_pid}.jpg {IMAGE_PATH}/error/")
@@ -68,8 +68,7 @@ def download_image(url, pid, num, info):
 def get_id(api, id):
     for _ in range(3):
         try:
-            rfirst = api.illust_detail(illust_id=id)
-            return rfirst
+            return api.illust_detail(illust_id=id)
         except Exception as e:
             time.sleep(3)
             logger.warning("详情获取错误，正在重试")
@@ -109,13 +108,12 @@ def lolicon_update(api, offset=None):
     ).json()
     ranknum = len(illustlist["data"])
     logger.info(f"已获取lolicon总计 {ranknum} 个")
-    i = 1
-    for image_info in illustlist["data"]:
+    for i, image_info in enumerate(illustlist["data"], start=1):
         print("========================================================================")
         image_pid = image_info["pid"]
         image_p = image_info["p"]
         logger.info(f"[{i} / {ranknum}] 作品ID：{image_pid}-{image_p}")
-        if not exists(str(image_pid) + "_p0"):
+        if not exists(f"{str(image_pid)}_p0"):
             time.sleep(0.3)
             for _ in range(3):
                 try:
@@ -129,7 +127,7 @@ def lolicon_update(api, offset=None):
                 image_info = image_info_raw["illust"]
                 image_id = image_info["id"]
                 image_title = image_info["title"]
-                logger.info("作品标题: " + image_title)
+                logger.info(f"作品标题: {image_title}")
             except KeyError:
                 if "error" in image_info_raw:
                     logger.error(image_info_raw["error"])
@@ -165,24 +163,20 @@ def lolicon_update(api, offset=None):
                             image_info,
                         )
                     else:
-                        image_num = 0
                         logger.info(f"多图({image_info['page_count']})")
-                        for image_mpages in image_info["meta_pages"]:
+                        for image_num, image_mpages in enumerate(
+                            image_info["meta_pages"]
+                        ):
                             image_url = image_mpages["image_urls"]["original"]
                             download_image(image_url, image_id, image_num, image_info)
-                            image_num += 1
                 else:
                     logger.info("类型不为 illust 已跳过")
         else:
             logger.info("图片已存在")
-        i += 1
 
 
 def start_spider(first=False):
-    if first:
-        offset = 0
-    else:
-        offset = None
+    offset = 0 if first else None
     while True:
         try:
             importlib.reload(sys)
@@ -205,11 +199,10 @@ def start_spider(first=False):
                 break
         except Exception as e:
             logger.error(e)
-            pass
         try:
             if restarts == 1:
                 tloop = 1
-            if restarts == 2:
+            elif restarts == 2:
                 tloop = 60
         except UnboundLocalError:
             tloop = 10

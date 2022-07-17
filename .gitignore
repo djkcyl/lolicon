@@ -7,3 +7,5 @@ pixiv/lolicon.py
 *.db
 *.txt
 .gitignore
+菲亚梅塔/*
+.user.ini
